@@ -100,6 +100,9 @@ export const analyzeText = (text: string) => {
   // Complex words (3+ syllables)
   const complexWords = words.filter((word) => countSyllables(word) >= 3).length;
   
+  // Word errors detection
+  const wordErrors = detectWordErrors(words);
+  
   // Sentiment analysis
   let positiveCount = 0;
   let negativeCount = 0;
@@ -140,6 +143,8 @@ export const analyzeText = (text: string) => {
       score: Math.max(0, Math.min(100, fleschScore)),
       gradeLevel: Math.max(1, gradeLevel),
       complexWords,
+      wordErrors: wordErrors.count,
+      errorWords: wordErrors.errors,
     },
     sentiment: {
       score: sentimentScore,
@@ -161,4 +166,44 @@ const countSyllables = (word: string): number => {
   
   const matches = word.match(/[aeiouy]{1,2}/g);
   return matches ? matches.length : 1;
+};
+
+// Helper function to detect word errors
+const detectWordErrors = (words: string[]): { count: number; errors: string[] } => {
+  const errors: string[] = [];
+  
+  words.forEach((word) => {
+    // Check for repeated characters (3+ times)
+    if (/(.)\1{2,}/.test(word)) {
+      errors.push(word);
+      return;
+    }
+    
+    // Check for all caps words (potential shouting/errors)
+    if (word.length > 3 && word === word.toUpperCase() && /[A-Z]/.test(word)) {
+      errors.push(word);
+      return;
+    }
+    
+    // Check for mixed case errors (liKe tHis)
+    const upperCount = (word.match(/[A-Z]/g) || []).length;
+    const lowerCount = (word.match(/[a-z]/g) || []).length;
+    if (upperCount > 0 && lowerCount > 0 && upperCount < word.length && lowerCount < word.length) {
+      if (upperCount > 1 && word[0] !== word[0].toUpperCase()) {
+        errors.push(word);
+        return;
+      }
+    }
+    
+    // Check for numbers mixed with letters incorrectly
+    if (/\d/.test(word) && /[a-zA-Z]/.test(word) && !/^\d+[a-zA-Z]+$|^[a-zA-Z]+\d+$/.test(word)) {
+      errors.push(word);
+      return;
+    }
+  });
+  
+  return {
+    count: errors.length,
+    errors: [...new Set(errors)], // Remove duplicates
+  };
 };
